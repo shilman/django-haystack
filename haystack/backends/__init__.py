@@ -120,7 +120,7 @@ class BaseSearchBackend(object):
 
     def build_search_kwargs(self, query_string, sort_by=None, start_offset=0, end_offset=None,
                             fields='', highlight=False, facets=None,
-                            date_facets=None, query_facets=None,
+                            date_facets=None, query_facets=None, range_facets=None,
                             narrow_queries=None, spelling_query=None,
                             within=None, dwithin=None, distance_point=None,
                             models=None, limit_to_registered_models=None,
@@ -294,6 +294,7 @@ class BaseSearchQuery(object):
         self.facets = {}
         self.date_facets = {}
         self.query_facets = []
+        self.range_facets = []
         self.narrow_queries = set()
         #: If defined, fields should be a list of field names - no other values
         #: will be retrieved so the caller must be careful to include django_ct
@@ -362,6 +363,9 @@ class BaseSearchQuery(object):
 
         if self.query_facets:
             kwargs['query_facets'] = self.query_facets
+
+        if self.range_facets:
+            kwargs['range_facets'] = self.range_facets
 
         if self.narrow_queries:
             kwargs['narrow_queries'] = self.narrow_queries
@@ -767,6 +771,11 @@ class BaseSearchQuery(object):
         from haystack import connections
         self.query_facets.append((connections[self._using].get_unified_index().get_facet_fieldname(field), query))
 
+    def add_range_facet(self, field, query, **kwargs):
+        """Adds a query facet on a field."""
+        from haystack import connections
+        self.range_facets.append((connections[self._using].get_unified_index().get_facet_fieldname(field), query, kwargs))
+
     def add_narrow_query(self, query):
         """
         Narrows a search to a subset of all documents per the query.
@@ -846,6 +855,7 @@ class BaseSearchQuery(object):
         clone.facets = self.facets.copy()
         clone.date_facets = self.date_facets.copy()
         clone.query_facets = self.query_facets[:]
+        clone.range_facets = self.range_facets[:]
         clone.narrow_queries = self.narrow_queries.copy()
         clone.start_offset = self.start_offset
         clone.end_offset = self.end_offset

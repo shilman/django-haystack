@@ -233,7 +233,7 @@ class ElasticsearchSearchBackend(BaseSearchBackend):
 
     def build_search_kwargs(self, query_string, sort_by=None, start_offset=0, end_offset=None,
                             fields='', highlight=False, facets=None,
-                            date_facets=None, query_facets=None,
+                            date_facets=None, query_facets=None, range_facets=None,
                             narrow_queries=None, spelling_query=None,
                             within=None, dwithin=None, distance_point=None,
                             models=None, limit_to_registered_models=None,
@@ -382,6 +382,18 @@ class ElasticsearchSearchBackend(BaseSearchBackend):
                             'query': value,
                         }
                     },
+                }
+
+        if range_facets is not None:
+            kwargs.setdefault('facets', {})
+
+            for facet_fieldname, ranges, range_kwargs in range_facets:
+                range_query = {
+                    'ranges' : [{'from': val0, 'to': val1} for val0, val1 in zip(ranges[:-1], ranges[1:])]
+                }
+                range_query.update(range_kwargs)
+                kwargs['facets'][facet_fieldname] = {
+                    'range': range_query
                 }
 
         if limit_to_registered_models is None:
@@ -576,6 +588,7 @@ class ElasticsearchSearchBackend(BaseSearchBackend):
                 'fields': {},
                 'dates': {},
                 'queries': {},
+                'ranges': {},
             }
 
             for facet_fieldname, facet_info in raw_results['facets'].items():
@@ -587,6 +600,8 @@ class ElasticsearchSearchBackend(BaseSearchBackend):
                     facets['dates'][facet_fieldname] = [(datetime.datetime.utcfromtimestamp(individual['time'] / 1000), individual['count']) for individual in facet_info['entries']]
                 elif facet_info.get('_type', 'terms') == 'query':
                     facets['queries'][facet_fieldname] = facet_info['count']
+                elif facet_info.get('_type', 'terms') == 'range':
+                    facets['ranges'][facet_fieldname] = facet_info['ranges']
 
         unified_index = connections[self.connection_alias].get_unified_index()
         indexed_models = unified_index.get_indexed_models()
@@ -926,6 +941,9 @@ class ElasticsearchSearchQuery(BaseSearchQuery):
 
         if self.query_facets:
             search_kwargs['query_facets'] = self.query_facets
+
+        if self.range_facets:
+            search_kwargs['range_facets'] = self.range_facets
 
         if self.within:
             search_kwargs['within'] = self.within
