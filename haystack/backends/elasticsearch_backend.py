@@ -387,9 +387,18 @@ class ElasticsearchSearchBackend(BaseSearchBackend):
         if range_facets is not None:
             kwargs.setdefault('facets', {})
 
+            def _range(val0, val1, idx, count):
+                if idx == 0:
+                    return {'to': val1}
+                elif idx == count-1:
+                    return {'from': val0}
+                else:
+                    return {'from': val0, 'to': val1}
+            
             for facet_fieldname, ranges, range_kwargs in range_facets:
+                pairs = zip(ranges[:-1], ranges[1:])
                 range_query = {
-                    'ranges' : [{'from': val0, 'to': val1} for val0, val1 in zip(ranges[:-1], ranges[1:])]
+                    'ranges' : [_range(val0, val1, idx, len(pairs)) for idx, (val0, val1) in enumerate(pairs)]
                 }
                 range_query.update(range_kwargs)
                 kwargs['facets'][facet_fieldname] = {
