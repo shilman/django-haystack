@@ -413,6 +413,11 @@ class SearchQuerySet(object):
         clone.query.add_query_facet(field, query)
         return clone
 
+    def nonnull(self, field):
+        clone = self._clone()
+        clone.query.add_nonnull(field)
+        return clone
+
     def range_facet(self, field, ranges, **kwargs):
         """Adds faceting to a query for the provided field with a custom query."""
         clone = self._clone()

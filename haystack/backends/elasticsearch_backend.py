@@ -232,7 +232,7 @@ class ElasticsearchSearchBackend(BaseSearchBackend):
                 self.log.error("Failed to clear Elasticsearch index: %s", e)
 
     def build_search_kwargs(self, query_string, sort_by=None, start_offset=0, end_offset=None,
-                            fields='', highlight=False, facets=None,
+                            fields='', highlight=False, facets=None, nonnulls=None,
                             date_facets=None, query_facets=None, range_facets=None,
                             narrow_queries=None, spelling_query=None,
                             within=None, dwithin=None, distance_point=None,
@@ -436,6 +436,31 @@ class ElasticsearchSearchBackend(BaseSearchBackend):
                     '_cache': True,
                 }
             }
+
+        if nonnulls:
+            exists = {}
+
+            if len(nonnulls) > 1:
+                raise NotImplementedError('ElasticSearch backend supports only one non-null field currently')
+
+            field = nonnulls[0]
+            kwargs['query'].setdefault('filtered', {})
+            kwargs['query']['filtered'].setdefault('filter', {})
+            missing_filter = {
+                'exists': {
+                    "field" : field,
+                }
+            }
+            if kwargs['query']['filtered']['filter']:
+                compound_filter = {
+                    "and": [
+                        kwargs['query']['filtered']['filter'],
+                        missing_filter,
+                    ]
+                }
+                kwargs['query']['filtered']['filter'] = compound_filter
+            else:
+                kwargs['query']['filtered']['filter'] = missing_filter
 
         if within is not None:
             from haystack.utils.geo import generate_bounding_box
@@ -953,6 +978,9 @@ class ElasticsearchSearchQuery(BaseSearchQuery):
 
         if self.range_facets:
             search_kwargs['range_facets'] = self.range_facets
+
+        if self.nonnulls:
+            search_kwargs['nonnulls'] = self.nonnulls
 
         if self.within:
             search_kwargs['within'] = self.within
