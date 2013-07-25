@@ -103,6 +103,7 @@ class ElasticsearchSearchBackend(BaseSearchBackend):
         self.log = logging.getLogger('haystack')
         self.setup_complete = False
         self.existing_mapping = {}
+        self.settings = None
 
     def setup(self):
         """
@@ -128,7 +129,8 @@ class ElasticsearchSearchBackend(BaseSearchBackend):
         if current_mapping != self.existing_mapping:
             try:
                 # Make sure the index is there first.
-                self.conn.create_index(self.index_name, self.DEFAULT_SETTINGS)
+                settings = self.settings or self.DEFAULT_SETTINGS
+                self.conn.create_index(self.index_name, settings)
                 self.conn.put_mapping(self.index_name, 'modelresult', current_mapping)
                 self.existing_mapping = current_mapping
             except Exception:
@@ -733,6 +735,9 @@ class ElasticsearchSearchBackend(BaseSearchBackend):
 
                 if not hasattr(field_class, 'facet_for') and not field_class.field_type in('ngram', 'edge_ngram'):
                     field_mapping["analyzer"] = "snowball"
+
+            if field_class.custom_analyzer:
+                field_mapping['analyzer'] = field_class.custom_analyzer
 
             mapping[field_class.index_fieldname] = field_mapping
 
